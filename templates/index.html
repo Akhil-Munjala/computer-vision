@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>SfM Pothole Analyzer – 3D Road Safety Intelligence</title>
+  <meta name="description"
+        content="Upload road video footage to detect potholes in real-time with YOLOv8, SIFT keypoint matching, Structure from Motion (SfM) and 3D volumetric analysis." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/static/css/style.css" />
+</head>
+<body>
+
+<!-- ═══════════════════ CANVAS BACKGROUND ═══════════════════ -->
+<canvas id="bg-canvas"></canvas>
+
+<!-- ═══════════════════ NAVBAR ═══════════════════════════════ -->
+<nav class="navbar" role="navigation" aria-label="Main navigation">
+  <div class="nav-inner">
+    <div class="nav-brand">
+      <span class="brand-icon" aria-hidden="true">🛣️</span>
+      <span class="brand-name">Pothole<span class="brand-accent">3D</span></span>
+    </div>
+    <div class="nav-pills">
+      <span class="pill">YOLOv8n</span>
+      <span class="pill">SIFT</span>
+      <span class="pill">SfM</span>
+      <span class="pill">3D Reconstruction</span>
+    </div>
+  </div>
+</nav>
+
+<!-- ═══════════════════ HERO ══════════════════════════════════ -->
+<header class="hero" role="banner">
+  <div class="hero-glow glow-1" aria-hidden="true"></div>
+  <div class="hero-glow glow-2" aria-hidden="true"></div>
+
+  <div class="hero-content">
+    <div class="hero-badge">
+      <span class="badge-dot"></span> SfM-Based Framework  ·  Real-World Measurement
+    </div>
+    <h1 class="hero-title">
+      Automated Pothole<br />
+      <span class="gradient-text">Localization &amp; Volumetric Analysis</span>
+    </h1>
+    <p class="hero-sub">
+      Upload a road video → detect potholes with YOLOv8 → match keypoints (SIFT) →
+      reconstruct 3D geometry (SfM) → measure real-world width, depth &amp; volume.
+    </p>
+
+    <!-- ── Pipeline steps ── -->
+    <ol class="pipeline-steps" aria-label="Processing pipeline">
+      <li class="step" id="step-1">
+        <span class="step-icon">🎞</span>
+        <span class="step-label">Frame<br/>Extraction</span>
+      </li>
+      <li class="step-arrow" aria-hidden="true">→</li>
+      <li class="step" id="step-2">
+        <span class="step-icon">🧠</span>
+        <span class="step-label">YOLOv8<br/>Detection</span>
+      </li>
+      <li class="step-arrow" aria-hidden="true">→</li>
+      <li class="step" id="step-3">
+        <span class="step-icon">📍</span>
+        <span class="step-label">SIFT<br/>Matching</span>
+      </li>
+      <li class="step-arrow" aria-hidden="true">→</li>
+      <li class="step" id="step-4">
+        <span class="step-icon">📐</span>
+        <span class="step-label">SfM<br/>Geometry</span>
+      </li>
+      <li class="step-arrow" aria-hidden="true">→</li>
+      <li class="step" id="step-5">
+        <span class="step-icon">📦</span>
+        <span class="step-label">3D<br/>Reconstruction</span>
+      </li>
+      <li class="step-arrow" aria-hidden="true">→</li>
+      <li class="step" id="step-6">
+        <span class="step-icon">📏</span>
+        <span class="step-label">Width &amp; Depth<br/>Estimation</span>
+      </li>
+    </ol>
+  </div>
+</header>
+
+<!-- ═══════════════════ UPLOAD SECTION ═══════════════════════ -->
+<main id="main-content">
+<section class="upload-section" aria-labelledby="upload-heading">
+  <div class="section-inner">
+    <h2 id="upload-heading" class="section-title">Upload Road Video</h2>
+    <p class="section-sub">Supports MP4 · AVI · MOV · MKV · WEBM (max 500 MB)</p>
+
+    <div class="upload-card glass">
+      <!-- Drop zone -->
+      <div class="drop-zone" id="drop-zone" role="button"
+           tabindex="0" aria-label="Video upload area – click or drag a file here">
+        <div class="drop-ring" aria-hidden="true"></div>
+        <div class="drop-content" id="drop-content">
+          <div class="drop-icon" aria-hidden="true">📹</div>
+          <p class="drop-primary">Drag &amp; drop your video here</p>
+          <p class="drop-secondary">or click to browse files</p>
+        </div>
+        <div class="drop-selected hidden" id="drop-selected">
+          <span class="selected-icon" aria-hidden="true">✅</span>
+          <span class="selected-name" id="selected-name"></span>
+          <span class="selected-size" id="selected-size"></span>
+        </div>
+        <input type="file" id="video-input" accept="video/*"
+               aria-label="Choose video file" />
+      </div>
+
+      <!-- Analyze button -->
+      <button class="btn-analyze" id="analyze-btn" disabled aria-live="polite">
+        <span class="btn-text">Analyze Video</span>
+        <span class="btn-icon" aria-hidden="true">⚡</span>
+      </button>
+
+      <!-- Progress bar -->
+      <div class="progress-wrap hidden" id="progress-wrap" role="status"
+           aria-label="Processing progress">
+        <div class="progress-bar" id="progress-bar"></div>
+        <p class="progress-label" id="progress-label">Initializing…</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════════ RESULTS SECTION ══════════════════════ -->
+<section class="results-section hidden" id="results-section"
+         aria-labelledby="results-heading">
+  <div class="section-inner">
+    <h2 id="results-heading" class="section-title">
+      Analysis Results
+      <span class="session-badge" id="session-badge"></span>
+    </h2>
+
+    <!-- ── Metrics row ── -->
+    <div class="metrics-grid" id="metrics-grid" role="region"
+         aria-label="Pothole measurements">
+      <div class="metric-card glass" id="mc-potholes">
+        <span class="metric-icon" aria-hidden="true">🕳</span>
+        <span class="metric-value" id="m-count">–</span>
+        <span class="metric-label">Potholes Found</span>
+      </div>
+      <div class="metric-card glass" id="mc-width">
+        <span class="metric-icon" aria-hidden="true">↔️</span>
+        <span class="metric-value" id="m-width">–</span>
+        <span class="metric-label">Width (cm)</span>
+      </div>
+      <div class="metric-card glass" id="mc-depth">
+        <span class="metric-icon" aria-hidden="true">↕️</span>
+        <span class="metric-value" id="m-depth">–</span>
+        <span class="metric-label">Depth (cm)</span>
+      </div>
+      <div class="metric-card glass" id="mc-area">
+        <span class="metric-icon" aria-hidden="true">📐</span>
+        <span class="metric-value" id="m-area">–</span>
+        <span class="metric-label">Area (cm²)</span>
+      </div>
+      <div class="metric-card glass" id="mc-volume">
+        <span class="metric-icon" aria-hidden="true">📦</span>
+        <span class="metric-value" id="m-volume">–</span>
+        <span class="metric-label">Volume (cm³)</span>
+      </div>
+      <div class="metric-card glass" id="mc-severity">
+        <span class="metric-icon" aria-hidden="true">⚠️</span>
+        <span class="metric-value" id="m-severity">–</span>
+        <span class="metric-label">Severity</span>
+      </div>
+      <div class="metric-card glass" id="mc-cost">
+        <span class="metric-icon" aria-hidden="true">💰</span>
+        <span class="metric-value" id="m-cost">–</span>
+        <span class="metric-label">Est. Repair Cost (USD)</span>
+      </div>
+      <div class="metric-card glass" id="mc-conf">
+        <span class="metric-icon" aria-hidden="true">🎯</span>
+        <span class="metric-value" id="m-conf">–</span>
+        <span class="metric-label">Confidence</span>
+      </div>
+    </div>
+
+    <!-- ── Image results grid ── -->
+    <div class="results-grid" id="results-grid">
+
+      <article class="result-card glass" id="card-detection"
+               aria-label="Pothole detection result">
+        <div class="card-header">
+          <span class="card-icon" aria-hidden="true">🧠</span>
+          <h3 class="card-title">Pothole Detection</h3>
+          <span class="card-badge">YOLOv8n + Contour</span>
+        </div>
+        <div class="card-img-wrap">
+          <img class="result-img" id="img-detection" src="" alt="Pothole detection output" />
+          <div class="img-overlay">
+            <a class="img-btn" id="dl-detection" href="" download
+               aria-label="Download detection image">⬇ Download</a>
+          </div>
+        </div>
+      </article>
+
+      <article class="result-card glass" id="card-matches"
+               aria-label="Keypoint matching result">
+        <div class="card-header">
+          <span class="card-icon" aria-hidden="true">📍</span>
+          <h3 class="card-title">Keypoint Matching</h3>
+          <span class="card-badge">SIFT + FLANN</span>
+        </div>
+        <div class="card-img-wrap">
+          <img class="result-img" id="img-matches" src="" alt="SIFT keypoint matching output" />
+          <div class="img-overlay">
+            <a class="img-btn" id="dl-matches" href="" download
+               aria-label="Download match image">⬇ Download</a>
+          </div>
+        </div>
+      </article>
+
+      <article class="result-card glass" id="card-depth"
+               aria-label="Depth map result">
+        <div class="card-header">
+          <span class="card-icon" aria-hidden="true">🗺</span>
+          <h3 class="card-title">Depth Map</h3>
+          <span class="card-badge">SfM – StereoBM</span>
+        </div>
+        <div class="card-img-wrap">
+          <img class="result-img" id="img-depth" src="" alt="SfM depth map output" />
+          <div class="img-overlay">
+            <a class="img-btn" id="dl-depth" href="" download
+               aria-label="Download depth map">⬇ Download</a>
+          </div>
+        </div>
+      </article>
+
+      <article class="result-card glass" id="card-cloud"
+               aria-label="3D point cloud result">
+        <div class="card-header">
+          <span class="card-icon" aria-hidden="true">☁️</span>
+          <h3 class="card-title">3D Point Cloud</h3>
+          <span class="card-badge">Triangulation</span>
+        </div>
+        <div class="card-img-wrap">
+          <img class="result-img" id="img-cloud" src="" alt="3D point cloud reconstruction" />
+          <div class="img-overlay">
+            <a class="img-btn" id="dl-cloud" href="" download
+               aria-label="Download 3D point cloud image">⬇ Download</a>
+          </div>
+        </div>
+      </article>
+
+    </div><!-- /.results-grid -->
+
+    <!-- Re-analyze button -->
+    <div class="reanalyze-wrap">
+      <button class="btn-reanalyze" id="reanalyze-btn">
+        ↩ Analyze Another Video
+      </button>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════════ FOOTER ════════════════════════════════ -->
+<footer class="site-footer" role="contentinfo">
+  <p>
+    Design &amp; Development of an SfM-Based Framework for Automated Pothole
+    Localization and Volumetric Analysis in 3D Scene Understanding
+  </p>
+  <p class="footer-stack">
+    YOLOv8 · SIFT · FLANN · Structure from Motion · OpenCV · Flask
+  </p>
+</footer>
+</main>
+
+<script src="/static/js/app.js"></script>
+</body>
+</html>
